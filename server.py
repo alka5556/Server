@@ -1,20 +1,25 @@
+#Importing standard libraries for networking, multi-threading, and file system operations
 import socket
 import threading
 import os
 
+#Server configuration: IP address and port to listen on
 PORT = 8080
 SERVER = "127.0.0.1"
 ADDR = (SERVER, PORT)
 
+#Folder structure for static files
 STATIC_ROOT = "www"
 ALLOWED_SUBDIR = "public"  
 BLOCKED_SUBDIR = "private" 
 
-# create folders and test files automatically
+#It creating folders and test files automatically
 def create_mock_files():
+    #Creating the main static root and subdirectories if they dont exist
     os.makedirs(STATIC_ROOT + "/" + ALLOWED_SUBDIR, exist_ok=True)
     os.makedirs(STATIC_ROOT + "/" + BLOCKED_SUBDIR, exist_ok=True)
     
+    #Creating 4 accessible files in the public folder
     with open(STATIC_ROOT + "/" + ALLOWED_SUBDIR + "/index.html", "w", encoding="utf-8") as f:
         f.write("<html><head><meta charset='utf-8'><title>Home Page</title></head><body><h1>My HTTP Server is Working!</h1><p>The assignment is running successfully.</p></body></html>")
     with open(STATIC_ROOT + "/" + ALLOWED_SUBDIR + "/about.html", "w", encoding="utf-8") as f:
@@ -23,10 +28,11 @@ def create_mock_files():
         f.write("body { background-color: #fafafa; font-family: sans-serif; }")
     with open(STATIC_ROOT + "/" + ALLOWED_SUBDIR + "/info.txt", "w", encoding="utf-8") as f:
         f.write("Plain text file successfully loaded.")
+        #Creating 1 blocked file in the private folder (to test 403 Forbidden)
     with open(STATIC_ROOT + "/" + BLOCKED_SUBDIR + "/secret.html", "w", encoding="utf-8") as f:
         f.write("<html><body><h1>403 Forbidden: Access Denied</h1></body></html>")
 
-# get content type based on file extension
+#Getting content type based on file extension
 def get_mime_type(file_path):
     if file_path.endswith(".html") or file_path.endswith(".htm"):
         return "text/html; charset=utf-8"
@@ -38,9 +44,9 @@ def get_mime_type(file_path):
         return "image/jpeg"
     elif file_path.endswith(".png"):
         return "image/png"
-    return "application/octet-stream"
+    return "application/octet-stream" #Default for unknown extensions
 
-# build and send the http response layout
+#Building and sending the http response layout
 def send_http_response(conn, status_code, status_text, content_type="text/html", body=b""):
     headers = "HTTP/1.0 " + str(status_code) + " " + status_text + "\r\n"
     headers += "Content-Type: " + content_type + "\r\n"
@@ -48,15 +54,16 @@ def send_http_response(conn, status_code, status_text, content_type="text/html",
     headers += "Connection: close\r\n"
     headers += "\r\n"  # empty line between headers and body
     
+    #Sending headers and body as bytes
     conn.sendall(headers.encode('ascii'))
     if body:
         conn.sendall(body)
 
-# client handler function for threads
+#Client handler function for threads
 def handle_client(conn, addr):
     print("Client connected from: " + str(addr))
     try:
-        # read from socket until end of headers
+        #Reading from socket until end of headers
         req_bytes = b""
         while b"\r\n\r\n" not in req_bytes:
             chunk = conn.recv(1024)
@@ -64,13 +71,13 @@ def handle_client(conn, addr):
                 break
             req_bytes += chunk
 
-        if not req_bytes:
+        if not req_bytes: #If the client disconnected without sending anything, just return
             return
-
+        #Decoding bytes to string and split with lines
         req_text = req_bytes.decode('utf-8', errors='ignore')
         lines = req_text.split("\r\n")
         
-        if len(lines) == 0 or not lines[0]:
+        if len(lines) == 0 or not lines[0]: #Checking if the request is empty
             send_http_response(conn, 400, "Bad Request", body=b"400 Bad Request")
             return
 
@@ -85,25 +92,25 @@ def handle_client(conn, addr):
         print("Request: " + method + " " + path + " from " + str(addr))
 
         # only GET method allowed
-        if method != "GET":
+        if method != "GET": #Only GET 
             send_http_response(conn, 405, "Method Not Allowed", body=b"405 Method Not Allowed")
             return
 
-        # directory traversal security check
+        #Directory traversal security check
         if ".." in path or "\\" in path:
             print("Security warning! Blocked path attempt: " + path)
             send_http_response(conn, 403, "Forbidden", body=b"403 Forbidden")
             return
 
-        # default route to index.html
+        #Default route to index.html
         if path == "/":
             path = "/" + ALLOWED_SUBDIR + "/index.html"
-        
+        #Cleaninggj up the path and check which subdirectory is being accesed
         clean_path = path.lstrip("/")
         parts = clean_path.split("/")
         subdir = parts[0] if len(parts) > 1 else ""
 
-        # check access permissions for subdirectory
+        #Checking access permission for subdirectory
         if subdir != ALLOWED_SUBDIR:
             print("Access blocked to folder: " + subdir + " for " + str(addr))
             send_http_response(conn, 403, "Forbidden", body=b"403 Forbidden")
@@ -111,32 +118,37 @@ def handle_client(conn, addr):
 
         full_path = os.path.join(STATIC_ROOT, clean_path)
 
-        # handle 404 if file doesn't exist
+        #Handling 404 if file doesnt exist
         if not os.path.exists(full_path) or os.path.isdir(full_path):
             send_http_response(conn, 404, "Not Found", body=b"404 Not Found")
             return
 
-        # read file content and serve it
+        #Read file content and serve it
         with open(full_path, "rb") as f:
             data = f.read()
             mime = get_mime_type(full_path)
             send_http_response(conn, 200, "OK", content_type=mime, body=data)
-
+#Handling timeout if a client connects but sends data too slowly
+    except socket.timeout:
+        print("Client " + str(addr) + " timed out (slow connection).")
+#Handling any other unexpected errors
     except Exception as e:
         print("Error handling client " + str(addr) + ": " + str(e))
-    finally:
+    finally: #Always closing connection to ensure the server remains stateless
         conn.close()
 
+#Main function to initialize the server and start listening for connections
 def start_server():
     create_mock_files()
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server_socket.bind(ADDR)
-    server_socket.listen()
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #Creating a TCP socket
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) #Allowing the socket to reuse the address immediately if the server restarts
+    server_socket.bind(ADDR)  #Binding the socket to the specified IP and Port
+    server_socket.listen() # Starting listening for incoming connections
     print("Server started on http://" + SERVER + ":" + str(PORT))
     
     while True:
         conn, addr = server_socket.accept()
+        conn.settimeout(5.0)
         t = threading.Thread(target=handle_client, args=(conn, addr))
         t.start()
 

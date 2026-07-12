@@ -16,28 +16,36 @@ This project is an HTTP/1.0 web server built from scratch in Python using the ba
 * **Multi-threading**: Uses Python's `threading` module to create a new thread for each client. This way, if one request is slow, it doesn't block other users from connecting.
 * **Stateless**: Closes the connection immediately after sending the response (`Connection: close`). It doesn't keep sessions open.
 
-#How to run and test
+## Dependencies:
+
+* **None.** This project uses only the Python Standard Library. 
+
+# How to run and test:
 
 1. Start the server from your terminal:
 ```bash
 python server.py
-### The server will automatically create the www folder with public and private subdirectories and generate 5 test files.
+
+The server will automatically create the www folder with public and private subdirectories and generate 5 test files.
 
 2. Open your browser and navigate to:
 [http://127.0.0.1:8080/](http://127.0.0.1:8080/)
 
-3. To check if the security features are working, try accessing these URLs:
+3. To test security and error handling, you need to access to these URLs in your browser:
 
-Blocked Directory: http://127.0.0.1:8080/private/secret.html (Should return 403 Forbidden)
+* **Blocked Directory:** http://127.0.0.1:8080/private/secret.html (Should return 403 Forbidden)
+* **Directory Traversal:** http://127.0.0.1:8080/../../etc/passwd (Should return 403 Forbidden)
+* **Not Found:** http://127.0.0.1:8080/public/notexists.html (Should return 404 Not Found)
 
-Directory Traversal: http://127.0.0.1:8080/../../etc/passwd (Should return 403 Forbidden)
-
-http://127.0.0.1:8080/public/notexists.html (Should return 404 Not Found)
-
-#### 5. Malformed Request (400 Bad Request)
-Test sending a corrupted HTTP request line that violates the standard format (Method Path Version). This can only be tested via terminal:
+4. Testing malformed request (400 Bad Request):
+Test sending a corrupted HTTP request line that violates the standard format. This can only be tested via terminal:
 ```bash
 python -c "import socket; s=socket.socket(); s.connect(('127.0.0.1',8080)); s.sendall(b'GET /\r\n\r\n'); print(s.recv(1024).decode()); s.close()"
 
-4. Run a verbose connection trace in your terminal to review explicit \r\n tokens and raw protocol layouts:
+5. Running a verbose connection trace in your terminal to review explicit \r\n tokens and raw protocol layouts:
 curl -v http://127.0.0.1:8080/ -UseBasicParsing
+Or
+curl.exe -v http://127.0.0.1:8080/public/index.html
+
+Testing video:
+
