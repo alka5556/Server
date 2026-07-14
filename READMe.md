@@ -47,5 +47,6 @@ curl -v http://127.0.0.1:8080/ -UseBasicParsing
 Or
 curl.exe -v http://127.0.0.1:8080/public/index.html
 
-Testing video:
+Testing video: https://drive.google.com/file/d/18Qqf5Feg5baKm1mJ5igZw08qzCDLpXkY/view?usp=sharing
+
 
